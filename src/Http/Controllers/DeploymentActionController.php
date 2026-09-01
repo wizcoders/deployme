@@ -140,6 +140,23 @@ class DeploymentActionController extends Controller
         $composer = (string) config('deployme.composer_bin', 'composer');
         $remote   = (string) config('deployme.remote', 'origin');
 
+        // php-fpm hands its workers a scrubbed environment: no $HOME, and a
+        // memory_limit far tighter than the CLI's. Composer needs both, which is
+        // why a deploy fails here having worked perfectly over SSH. Supply them
+        // ourselves rather than depending on each host's pool config.
+        $composerHome = trim((string) config('deployme.composer_home', ''));
+
+        if ($composerHome === '') {
+            $composerHome = storage_path('app/.composer');
+        }
+
+        @mkdir($composerHome, 0755, true);
+
+        $env = [
+            'COMPOSER_HOME'         => $composerHome,
+            'COMPOSER_MEMORY_LIMIT' => (string) config('deployme.composer_memory_limit', '-1'),
+        ];
+
         $steps = [
             'git pull ' . escapeshellarg($remote) . ' ' . escapeshellarg($branch),
             $composer . ' install --no-interaction --prefer-dist',
@@ -148,8 +165,10 @@ class DeploymentActionController extends Controller
         ];
 
         $logger  = DeployLogger::open($path);
-        $results = [];
-        $failed  = null;
+        $results    = [];
+        $failed     = null;
+        $failedExit = null;
+        $failedLog  = '';
 
         if ($logger !== null) {
             $logger->write('Deploy started ' . date('Y-m-d H:i:s') . " — branch {$branch} (triggered)");
@@ -157,6 +176,7 @@ class DeploymentActionController extends Controller
 
         foreach ($steps as $step) {
             $result = Process::path($path)
+                ->env($env)
                 ->timeout((int) config('deployme.timeout', 600))
                 ->run($step);
 
@@ -177,7 +197,9 @@ class DeploymentActionController extends Controller
             // exit code: a failing command still *prints*, so output is not a
             // usable success signal.
             if (! $result->successful()) {
-                $failed = $step;
+                $failed     = $step;
+                $failedExit = $result->exitCode();
+                $failedLog  = $output;
                 break;
             }
         }
@@ -190,7 +212,13 @@ class DeploymentActionController extends Controller
         fclose($lock);
 
         if ($failed !== null) {
-            Log::error('deployme: deploy failed', ['branch' => $branch, 'step' => $failed]);
+            Log::error('deployme: deploy failed', [
+                'via'    => 'trigger',
+                'branch' => $branch,
+                'step'   => $failed,
+                'exit'   => $failedExit,
+                'output' => $this->tail($failedLog),
+            ]);
 
             return response()->json([
                 'status' => 'failed',
@@ -206,5 +234,23 @@ class DeploymentActionController extends Controller
             'branch' => $branch,
             'steps'  => $results,
         ]);
+    }
+
+    /**
+     * The last 1KB of a failed step's output, for the Laravel log.
+     *
+     * Composer and git print the actual reason for a failure — "HOME must be
+     * set", "Allowed memory size exhausted" — and without it the log says only
+     * that something went wrong. None of these commands echo the token or the
+     * secret, so this is safe to record; the guard values must still never be
+     * logged anywhere.
+     */
+    private function tail(string $output, int $limit = 1024): string
+    {
+        $output = trim($output);
+
+        return strlen($output) <= $limit
+            ? $output
+            : '…' . substr($output, -$limit);
     }
 }

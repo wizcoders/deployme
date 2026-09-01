@@ -35,6 +35,8 @@ DEPLOY_REMOTE=origin
 DEPLOY_PATH=               # blank = the host app's base_path()
 DEPLOY_PHP_BIN=php
 DEPLOY_COMPOSER_BIN=composer
+DEPLOY_COMPOSER_HOME=          # blank = storage/app/.composer
+DEPLOY_COMPOSER_MEMORY_LIMIT=-1
 DEPLOY_TIMEOUT=600
 DEPLOY_LOGS_DIRECTORY_PATH="../deploylogs/"
 ```
@@ -135,6 +137,51 @@ out. `DEPLOY_TIMEOUT` caps each step individually.
 `composer` and `php` must be on the **web user's** PATH, which is often not the PATH
 you get over SSH. Set `DEPLOY_COMPOSER_BIN` / `DEPLOY_PHP_BIN` to absolute paths if a
 step exits non-zero with no output.
+
+## Why it works over SSH but not over the webhook
+
+Because they are not the same environment. Your shell runs as you, with your PATH,
+your `$HOME` and your CLI `php.ini`. A deploy runs as the **web user** inside a
+php-fpm worker, and php-fpm starts its workers with a *scrubbed* environment — unless
+a pool config says otherwise, there is no `$HOME` at all. Composer refuses to run
+without one, and inherits fpm's `memory_limit` rather than the CLI's.
+
+So the package supplies both itself, rather than depending on each host being
+configured the same way:
+
+| Variable | Default | Why |
+|---|---|---|
+| `COMPOSER_HOME` | `storage/app/.composer` | Somewhere for composer's cache that the web user already has to own for Laravel to boot. Override with `DEPLOY_COMPOSER_HOME`. |
+| `COMPOSER_MEMORY_LIMIT` | `-1` | Applies to the composer subprocess only, never to the fpm worker. Override with `DEPLOY_COMPOSER_MEMORY_LIMIT`. |
+
+To reproduce a web-user failure from your shell, strip your environment rather than
+trusting a bare `composer install`:
+
+```bash
+sudo -u www-data env -i /usr/local/bin/composer install --no-interaction --prefer-dist
+```
+
+## When a step fails
+
+Two places record it. The Laravel log gets the step, its exit code and the last 1KB of
+its output:
+
+```
+production.ERROR: deployme: deploy failed {"via":"trigger","branch":"dev",
+  "step":"...composer install...","exit":1,"output":"..."}
+```
+
+`via` distinguishes the webhook from the manual trigger. The full, untruncated output
+of every step is in that run's file under `DEPLOY_LOGS_DIRECTORY_PATH`.
+
+Reading the exit code:
+
+| Exit | Usually means |
+|---|---|
+| `127` | Binary not found — the web user's PATH. Set `DEPLOY_COMPOSER_BIN` / `DEPLOY_PHP_BIN` to absolute paths. For a phar: `DEPLOY_COMPOSER_BIN="/usr/bin/php /usr/local/bin/composer.phar"`. |
+| `126` | Found but not executable by the web user. |
+| `1` | The command ran and refused. Read the `output` — it says which: no `$HOME`, memory exhausted, a permissions error on `vendor/`, or `Permission denied (publickey)` for a private VCS repo the web user has no key for. |
+| `255` | PHP fatal, typically inside `artisan`. |
 
 ## Branch resolution
 

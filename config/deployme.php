@@ -80,6 +80,24 @@ return [
     'php_bin'      => env('DEPLOY_PHP_BIN', 'php'),
     'composer_bin' => env('DEPLOY_COMPOSER_BIN', 'composer'),
 
+    /*
+    | php-fpm starts its workers with a scrubbed environment, so the web user
+    | usually has no $HOME — and composer refuses to run at all without somewhere
+    | to keep its cache. We therefore hand it one explicitly rather than relying
+    | on the pool config, which differs on every host in the estate.
+    |
+    | Blank resolves to storage_path('app/.composer'), which the web user already
+    | has to own for Laravel to boot.
+    */
+    'composer_home' => env('DEPLOY_COMPOSER_HOME', ''),
+
+    /*
+    | Composer is memory-hungry and inherits php-fpm's memory_limit, which is
+    | normally far tighter than the CLI's. -1 is what composer's own docs
+    | recommend; it applies to the composer subprocess only, not to the worker.
+    */
+    'composer_memory_limit' => env('DEPLOY_COMPOSER_MEMORY_LIMIT', '-1'),
+
     // Per-command timeout in seconds. composer install is the slow one.
     'timeout' => (int) env('DEPLOY_TIMEOUT', 600),
 
