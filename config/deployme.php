@@ -24,6 +24,11 @@ return [
     'route' => [
         'enabled'    => (bool) env('DEPLOYME_ROUTE_ENABLED', true),
         'path'       => env('DEPLOYME_ROUTE_PATH', 'api/deploy/gitea'),
+
+        // The token-only trigger. Configurable so it cannot collide with `path`
+        // on a site that has moved the webhook.
+        'action_path' => env('DEPLOYME_ACTION_ROUTE_PATH', 'api/deploy'),
+
         'middleware' => ['api', 'throttle:10,1'],
     ],
 
@@ -41,6 +46,12 @@ return [
 
     // Gitea webhook "Secret" — drives the X-Gitea-Signature HMAC-SHA256.
     'secret' => env('DEPLOY_WEBHOOK_SECRET', ''),
+
+    // Bearer token for the token-only trigger (POST api/deploy). Deliberately
+    // separate from `token`: that endpoint has no HMAC behind it, so it is a
+    // weaker guard and must be rotatable without touching the webhook. Empty
+    // means "not set up", and the trigger answers 404.
+    'action_token' => env('DEPLOY_ACTION_TOKEN', ''),
 
     /*
     |--------------------------------------------------------------------------
