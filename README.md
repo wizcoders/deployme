@@ -38,7 +38,7 @@ DEPLOY_COMPOSER_BIN=composer
 DEPLOY_COMPOSER_HOME=          # blank = storage/app/.composer
 DEPLOY_COMPOSER_MEMORY_LIMIT=-1
 DEPLOY_TIMEOUT=600
-DEPLOY_LOGS_DIRECTORY_PATH="../deploylogs/"
+DEPLOY_LOGS_DIRECTORY_PATH="storage/logs/deploy"
 ```
 
 Each secret gates its own endpoint, and every one of them is required for that
@@ -173,6 +173,32 @@ production.ERROR: deployme: deploy failed {"via":"trigger","branch":"dev",
 
 `via` distinguishes the webhook from the manual trigger. The full, untruncated output
 of every step is in that run's file under `DEPLOY_LOGS_DIRECTORY_PATH`.
+
+### No run files appearing?
+
+`DEPLOY_LOGS_DIRECTORY_PATH` resolves **relative to the repository root**, not the CWD,
+and it must be writable by the *web user* — not by you. A path like `../deploylogs/`
+lands outside the application, in `/var/www/` on a typical layout, which the web user
+almost never owns; `open_basedir`, where it is set, blocks the `..` traversal for the
+same result. Prefer somewhere inside the app that the web user already has to own:
+
+```
+DEPLOY_LOGS_DIRECTORY_PATH="storage/logs/deploy"
+```
+
+A deploy is never blocked by a log it cannot write, but it no longer stays quiet about
+it either — the Laravel log gets a warning naming the configured path, the path it
+resolved to, and whether the parent is writable:
+
+```
+production.WARNING: deployme: could not create the deploy log directory —
+  the deploy will still run, but unlogged
+  {"configured":"../deploylogs/","resolved":"/var/www/site/../deploylogs/",
+   "parent":"/var/www/site/..","parent_writable":false,"error":"mkdir(): Permission denied"}
+```
+
+Blank the setting to turn file logging off deliberately; that is the one case that
+passes without a warning.
 
 Reading the exit code:
 
