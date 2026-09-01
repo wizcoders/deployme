@@ -82,5 +82,5 @@ return [
     |
     */
 
-    'logs_path' => env('DEPLOY_LOGS_DIRECTORY_PATH', '../../deploylogs/'),
+    'logs_path' => env('DEPLOY_LOGS_DIRECTORY_PATH', '../deploylogs/'),
 ];

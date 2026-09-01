@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Wizcoders\Deployme\Support\DeployLogger;
 use Wizcoders\Deployme\Support\Git;
 
 /**
@@ -159,11 +160,13 @@ class DeployController extends Controller
             $php . ' artisan optimize',
         ];
 
-        $log     = $this->openLog($path);
+        $logger  = DeployLogger::open($path);
         $results = [];
         $failed  = null;
 
-        $this->write($log, 'Deploy started ' . date('Y-m-d H:i:s') . " — branch {$branch}");
+        if ($logger !== null) {
+            $logger->write('Deploy started ' . date('Y-m-d H:i:s') . " — branch {$branch}");
+        }
 
         foreach ($steps as $step) {
             $result = Process::path($path)
@@ -172,7 +175,9 @@ class DeployController extends Controller
 
             $output = trim($result->output() . "\n" . $result->errorOutput());
 
-            $this->write($log, "$ {$step}\n{$output}");
+            if ($logger !== null) {
+                $logger->writeCommand($step, $output);
+            }
 
             $results[] = [
                 'command' => $step,
@@ -188,10 +193,8 @@ class DeployController extends Controller
             }
         }
 
-        $this->write($log, $failed === null ? 'Deploy finished OK' : "Deploy ABORTED at: {$failed}");
-
-        if ($log !== null) {
-            fclose($log);
+        if ($logger !== null) {
+            $logger->write($failed === null ? 'Deploy finished OK' : "Deploy ABORTED at: {$failed}");
         }
 
         flock($lock, LOCK_UN);
@@ -212,44 +215,6 @@ class DeployController extends Controller
             'branch' => $branch,
             'steps'  => $results,
         ]);
-    }
-
-    /**
-     * One run log per deploy. Returns null rather than throwing — a missing or
-     * unwritable log directory must not block a deploy.
-     *
-     * @return resource|null
-     */
-    private function openLog(string $repositoryPath)
-    {
-        $path = trim((string) config('deployme.logs_path', ''));
-
-        if ($path === '') {
-            return null;
-        }
-
-        // Relative paths in .env are relative to the repository root, not the CWD.
-        if (! Git::isAbsolute($path)) {
-            $path = $repositoryPath . DIRECTORY_SEPARATOR . $path;
-        }
-
-        // Colons are legal in a POSIX filename but not on Windows, and they make
-        // the log awkward to scp — so H-i-s, not H:i:s.
-        $file = rtrim($path, '/\\') . DIRECTORY_SEPARATOR . date('Y-m-d H-i-s') . '.txt';
-
-        $handle = @fopen($file, 'w');
-
-        return $handle === false ? null : $handle;
-    }
-
-    /**
-     * @param  resource|null  $log
-     */
-    private function write($log, string $line): void
-    {
-        if ($log !== null) {
-            fwrite($log, $line . "\n");
-        }
     }
 
     /**
