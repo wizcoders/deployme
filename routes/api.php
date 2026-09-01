@@ -20,7 +20,7 @@ Route::post(config('deployme.route.path', 'api/deploy/gitea'), [DeployController
 | Simple token-based deployment trigger, for deploys fired by hand or by CI.
 |
 | Requires an Authorization header carrying the bearer token configured in
-| deployme.action_token (usually from the DEPLOY_ACTION_TOKEN env). That is a
+| deployme.deploy_token (usually from the DEPLOY_TOKEN env). That is a
 | different secret from the webhook's — this endpoint has no HMAC behind it.
 */
 

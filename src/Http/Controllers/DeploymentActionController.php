@@ -59,7 +59,7 @@ class DeploymentActionController extends Controller
      */
     private function authorised(Request $request): bool
     {
-        $token    = (string) config('deployme.action_token', '');
+        $token    = (string) config('deployme.deploy_token', '');
         $provided = $this->bearerToken($request);
 
         return $token !== '' && $provided !== '' && hash_equals($token, $provided);

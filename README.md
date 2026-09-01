@@ -29,7 +29,7 @@ Everything is per-site and belongs in that site's `.env`, never in the repo:
 ```
 DEPLOY_WEBHOOK_TOKEN=      # the Authorization header value Gitea sends
 DEPLOY_WEBHOOK_SECRET=     # the Gitea webhook Secret, used for the HMAC
-DEPLOY_ACTION_TOKEN=       # bearer token for the manual POST api/deploy trigger
+DEPLOY_TOKEN=       # bearer token for the manual POST api/deploy trigger
 DEPLOY_BRANCH=             # blank = deploy whatever branch is checked out
 DEPLOY_REMOTE=origin
 DEPLOY_PATH=               # blank = the host app's base_path()
@@ -42,7 +42,7 @@ DEPLOY_LOGS_DIRECTORY_PATH="../deploylogs/"
 Each secret gates its own endpoint, and every one of them is required for that
 endpoint to answer: empty means "not set up", which denies with a 404. Set them
 *before* pointing anything at the site. A site that only wants the webhook can leave
-`DEPLOY_ACTION_TOKEN` blank, and vice versa.
+`DEPLOY_TOKEN` blank, and vice versa.
 
 Routing is configurable too, for sites that need to move or silence an endpoint:
 
@@ -71,7 +71,7 @@ Repository → Settings → Webhooks → Gitea:
 
 ```bash
 curl -X POST https://<site>/api/deploy \
-     -H "Authorization: Bearer $DEPLOY_ACTION_TOKEN"
+     -H "Authorization: Bearer $DEPLOY_TOKEN"
 ```
 
 It runs the same four steps, against the same working copy, holding the same lock as
@@ -96,7 +96,7 @@ On the webhook (`api/deploy/gitea`), two checks, both required, both constant-ti
    — proves the payload was not rewritten in transit.
 
 Either one alone is not enough. The manual trigger has only check 1, against
-`deployme.action_token` — there is no body to sign.
+`deployme.deploy_token` — there is no body to sign.
 
 Both routes reject with a bare `404` so they do not advertise themselves to a scanner,
 both compare with `hash_equals()`, and both are rate limited to 10 requests a minute.

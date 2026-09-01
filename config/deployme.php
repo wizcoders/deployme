@@ -51,7 +51,7 @@ return [
     // separate from `token`: that endpoint has no HMAC behind it, so it is a
     // weaker guard and must be rotatable without touching the webhook. Empty
     // means "not set up", and the trigger answers 404.
-    'action_token' => env('DEPLOY_ACTION_TOKEN', ''),
+    'deploy_token' => env('DEPLOY_TOKEN', ''),
 
     /*
     |--------------------------------------------------------------------------
