@@ -4,6 +4,22 @@ Push-to-deploy for Laravel. Two endpoints over one deploy routine: a Gitea webho
 guarded by two independent checks, and a token-only trigger for deploys you fire
 by hand or from CI.
 
+## Requirements
+
+| Package        | Supported                                  |
+| -------------- | ------------------------------------------ |
+| PHP            | 8.1+ (8.2+ if you are on Laravel 12)        |
+| Laravel        | 10.x, 11.x, 12.x                            |
+
+The package depends on the individual `illuminate/*` components rather than on
+`laravel/framework`, so it drops into an app on any of the three without pulling
+a second copy of the framework. `illuminate/process` is the one hard floor: the
+`Process` facade this package runs its deploy steps through landed in 10.17, so
+Laravel 10 apps must be on 10.17 or later.
+
+Every combination is resolved and linted in CI — see
+`.github/workflows/compatibility.yml`.
+
 ## Install
 
 The package lives in this repository under `packages/wizcoders/deployme` and is wired
@@ -216,8 +232,3 @@ no `exec()`, so it works on hosts where shell functions are disabled. A detached
 yields no branch: the push is ignored rather than guessed at, and the manual trigger
 answers `400`.
 
-## Not a replacement for `deploy.php`
-
-The estate's hand-fired `deploy.php` stays. That file is deliberately different on
-every site and must never be synced; this package is identical everywhere and keeps
-the differences in `.env`. Sites can run either, or both.

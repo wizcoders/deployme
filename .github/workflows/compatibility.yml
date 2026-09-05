@@ -1,0 +1,64 @@
+name: Compatibility
+
+# Proves the constraint in composer.json: this package installs and parses on
+# every supported Laravel major, on every PHP that major supports.
+#
+# The matrix pins the *edges* deliberately — the oldest PHP each Laravel accepts
+# and the newest — because that is where a resolution break or a new deprecation
+# actually shows up. Adding a Laravel major means adding its rows here, not just
+# widening the constraint.
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  resolve:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Laravel 10 — PHP 8.1+
+          - { php: '8.1', laravel: '10.*' }
+          - { php: '8.3', laravel: '10.*' }
+          # Laravel 11 — PHP 8.2+
+          - { php: '8.2', laravel: '11.*' }
+          - { php: '8.3', laravel: '11.*' }
+          # Laravel 12 — PHP 8.2+
+          - { php: '8.2', laravel: '12.*' }
+          - { php: '8.4', laravel: '12.*' }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish --no-check-lock
+
+      # --dev, and never committed: the package itself must not depend on the
+      # framework metapackage, only on the illuminate/* components it uses.
+      - name: Pin the Laravel version under test
+        run: composer require --dev --no-interaction --no-update "laravel/framework:${{ matrix.laravel }}"
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Confirm the resolved Laravel major
+        run: composer show laravel/framework | head -3
+
+      # Catches syntax that the target PHP rejects, and (with -d) anything the
+      # target PHP has newly deprecated.
+      - name: Lint sources
+        run: find src routes config -name '*.php' -print0 | xargs -0 -n1 -P4 php -d error_reporting=E_ALL -l
