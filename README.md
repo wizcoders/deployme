@@ -8,11 +8,11 @@ by hand or from CI.
 
 | Package        | Supported                                  |
 | -------------- | ------------------------------------------ |
-| PHP            | 8.1+ (8.2+ if you are on Laravel 12)        |
-| Laravel        | 10.x, 11.x, 12.x                            |
+| PHP            | 8.1+ (8.2+ on Laravel 11/12, 8.3+ on Laravel 13) |
+| Laravel        | 10.x, 11.x, 12.x, 13.x                     |
 
 The package depends on the individual `illuminate/*` components rather than on
-`laravel/framework`, so it drops into an app on any of the three without pulling
+`laravel/framework`, so it drops into an app on any of the four without pulling
 a second copy of the framework. `illuminate/process` is the one hard floor: the
 `Process` facade this package runs its deploy steps through landed in 10.17, so
 Laravel 10 apps must be on 10.17 or later.

@@ -34,6 +34,9 @@ jobs:
           # Laravel 12 — PHP 8.2+
           - { php: '8.2', laravel: '12.*' }
           - { php: '8.4', laravel: '12.*' }
+          # Laravel 13 — PHP 8.3+
+          - { php: '8.3', laravel: '13.*' }
+          - { php: '8.5', laravel: '13.*' }
 
     steps:
       - uses: actions/checkout@v4
